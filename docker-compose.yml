@@ -1,0 +1,57 @@
+version: '3.9'
+
+services:
+  api:
+    build: ./backend
+    container_name: graphvault-api
+    ports:
+      - "4087:8080"
+    environment:
+      - DATABASE_URL=postgresql://gv_app:gv_secret_2026@postgres:5432/graphvault
+      - SSO_JWT_SECRET=nexuslayer-shared-sso-secret-change-in-production-64chars!!
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - gv-net
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: https://graph.nexuslayer.eu/api
+        VITE_IDENTITY_URL: https://identity.nexuslayer.eu
+    container_name: graphvault-frontend
+    ports:
+      - "4007:80"
+    depends_on:
+      - api
+    networks:
+      - gv-net
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: graphvault-postgres
+    environment:
+      POSTGRES_DB: graphvault
+      POSTGRES_USER: gv_app
+      POSTGRES_PASSWORD: gv_secret_2026
+    volumes:
+      - gv_pgdata:/var/lib/postgresql/data
+    networks:
+      - gv-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gv_app -d graphvault"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+networks:
+  gv-net:
+    driver: bridge
+
+volumes:
+  gv_pgdata:
